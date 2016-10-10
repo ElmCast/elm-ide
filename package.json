@@ -1,0 +1,31 @@
+{
+    "name": "ElmIDE",
+    "version": "1.0.0",
+    "description": "Elm IDE written in Elm and backed by NeoVim",
+    "main": "app/electron.js",
+    "scripts": {
+        "elm-watch": "nodemon --exec elm make src/Main.elm --output app/elm.js -w src -e elm --quiet",
+        "elm-make" : "elm make src/Main.elm --output app/elm.js",
+        "start": "electron ."
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/elmcast/elm-ide.git"
+    },
+    "keywords": [
+        "Elm"
+    ],
+    "author": "Joseph Hager",
+    "license": "BSD-3-Clause",
+    "bugs": {
+        "url": "https://github.com/elmcast/elm-ide/issues"
+    },
+    "homepage": "https://github.com/elmcast/elm-ide#readme",
+    "devDependencies": {
+        "electron": "^1.4.3",
+        "nodemon": "^1.11.0"
+    },
+    "dependencies": {
+        "neovim-client": "^2.1.0"
+    }
+}
