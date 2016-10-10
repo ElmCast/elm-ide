@@ -1,6 +1,6 @@
 # ElmIDE
 
-Written in Elm and backed by NeoVim.
+> Written in Elm. Backed by NeoVim.
 
 ## Development
 
