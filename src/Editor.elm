@@ -1,6 +1,5 @@
-port module Editor exposing (..)
+port module Editor exposing (init, update, view, subscriptions)
 
-import Array exposing (Array)
 import Html exposing (..)
 import Json.Decode as JD exposing ((:=))
 import Json.Encode as JE
@@ -9,14 +8,6 @@ import String
 
 
 -- MODEL
-
-
-type alias Size =
-    { columns : Int
-    , lines : Int
-    , width : Float
-    , height : Float
-    }
 
 
 type alias Cursor =
@@ -89,7 +80,7 @@ type alias Editor =
     , mouseEnabled : Bool
     , screenDragging : ScreenDrag
     , title : String
-    , iconPath : String
+    , icon : String
     , screenScrolling : ScreenScroll
     , scrollRegion : Region
     , focused : Bool
@@ -232,6 +223,9 @@ update msg model =
         SetTitle title ->
             ( { model | title = title }, Cmd.none )
 
+        SetIcon icon ->
+            ( { model | icon = icon }, Cmd.none )
+
         EditorMessage message ->
             ( { model | messages = model.messages ++ [ message ] }, Cmd.none )
 
@@ -246,10 +240,10 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ Html.text "Errors" ]
-        , div [] <| List.map (\t -> li [] [ Html.text t ]) model.errors
-        , h1 [] [ Html.text "Messages" ]
-        , div [] <| List.map (\t -> li [] [ Html.text t ]) model.messages
+        [ h1 [] [ text "Errors" ]
+        , div [] <| List.map (\t -> li [] [ text t ]) model.errors
+        , h1 [] [ text "Messages" ]
+        , div [] <| List.map (\t -> li [] [ text t ]) model.messages
         ]
 
 
