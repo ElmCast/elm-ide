@@ -4,7 +4,6 @@ import Html exposing (..)
 import Json.Decode as JD exposing ((:=))
 import Json.Encode as JE
 import ParseInt
-import String
 
 
 -- MODEL
@@ -13,23 +12,6 @@ import String
 type alias Cursor =
     { line : Int
     , column : Int
-    }
-
-
-type alias Font =
-    { fg : String
-    , bg : String
-    , sp : String
-    , bold : Bool
-    , italic : Bool
-    , underline : Bool
-    , undercurl : Bool
-    , drawWidth : Float
-    , drawHeight : Float
-    , width : Float
-    , height : Float
-    , size : Int
-    , face : String
     }
 
 
@@ -45,50 +27,29 @@ type alias Highlight =
     }
 
 
-type alias ScreenDrag =
-    { line : Int
-    , column : Int
-    }
-
-
-type alias ScreenScroll =
-    { x : Float
-    , y : Float
-    }
-
-
 type alias Region =
-    { top : Float
-    , left : Float
-    , right : Float
-    , bottom : Float
+    { top : Int
+    , left : Int
+    , right : Int
+    , bottom : Int
     }
 
 
 type alias Editor =
     { columns : Int
     , lines : Int
-    , width : Float
-    , height : Float
-    , font : Font
     , fgColor : String
     , bgColor : String
     , spColor : String
+    , highlight : Highlight
     , cursor : Cursor
+    , scroll : Int
+    , scrollRegion : Region
     , mode : String
     , busy : Bool
-    , mouseEnabled : Bool
-    , screenDragging : ScreenDrag
+    , mouse : Bool
     , title : String
     , icon : String
-    , screenScrolling : ScreenScroll
-    , scrollRegion : Region
-    , focused : Bool
-    , lineHeight : Float
-    , cursorDelay : Float
-    , cursorBlink : Bool
-    , cursorFloaterval : Int
-    , messages : List String
     , errors : List String
     }
 
@@ -102,27 +63,18 @@ init =
     ( Editor
         80
         25
-        0
-        0
-        (Font "#ffffff" "000000" "" False False False False 1 1 1 1 16 "monospace")
         ""
         ""
         ""
+        (Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
         (Cursor 0 0)
+        0
+        (Region 0 0 0 0)
         "normal"
         False
         True
-        (ScreenDrag 0 0)
-        "elm neovim"
+        "ElmIDE"
         ""
-        (ScreenScroll 0 0)
-        (Region 0 0 0 0)
-        True
-        1.2
-        10
-        False
-        1000
-        []
         []
     , Cmd.none
     )
@@ -149,57 +101,81 @@ attach columns lines =
 
 type Msg
     = Bell
-    | BusyStart
-    | BusyStop
-    | ChangeCursorDrawDelay
+    | Busy Bool
     | Clear
-    | EolClear
     | CursorGoto Int Int
-    | DragEnd
-    | DragStart
-    | DragUpdate
-    | EditorMessage String
-    | MouseOn
-    | MouseOff
-    | HighlightSet (List Highlight)
-    | Input
-    | ModeChange String
-    | Ready
     | Disconnect
+    | EolClear
     | Error String
+    | HighlightSet (List Highlight)
+    | ModeChange String
+    | Mouse Bool
     | Put (List String)
+    | Ready
     | Resize Int Int
     | Scroll Int
     | SetIcon String
     | SetScrollRegion Int Int Int Int
     | SetTitle String
-    | StartBlinkCursor
-    | StopBlinkCursor
     | UpdateBg Int
     | UpdateFg Int
     | UpdateSp Int
-    | UpdateFontFace
-    | UpdateFontPx
-    | UpdateFontSize
-    | UpdateLineHeight
-    | UpdateScreenBounds
-    | UpdateScreenSize
     | VisualBell
-    | WheelScroll
-    | FocusChanged
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Bell ->
+            ( model, Cmd.none )
+
+        Busy bool ->
+            ( { model | busy = bool }, Cmd.none )
+
+        Clear ->
+            ( model, Cmd.none )
+
+        CursorGoto column line ->
+            ( { model | cursor = Cursor column line }, Cmd.none )
+
+        Disconnect ->
+            ( model, Cmd.none )
+
+        EolClear ->
+            ( model, Cmd.none )
+
         Error message ->
             ( { model | errors = message :: model.errors }, Cmd.none )
+
+        HighlightSet highlights ->
+            ( model, Cmd.none )
+
+        ModeChange mode ->
+            ( { model | mode = mode }, Cmd.none )
+
+        Mouse bool ->
+            ( { model | mouse = bool }, Cmd.none )
+
+        Put strings ->
+            ( model, Cmd.none )
 
         Ready ->
             ( model, attach model.columns model.lines )
 
-        CursorGoto column line ->
-            ( { model | cursor = Cursor column line }, Cmd.none )
+        Resize columns lines ->
+            ( { model | columns = columns, lines = lines }, Cmd.none )
+
+        Scroll scroll ->
+            ( { model | scroll = scroll }, Cmd.none )
+
+        SetScrollRegion top left right bottom ->
+            ( { model | scrollRegion = Region top left right bottom }, Cmd.none )
+
+        SetIcon icon ->
+            ( { model | icon = icon }, Cmd.none )
+
+        SetTitle title ->
+            ( { model | title = title }, Cmd.none )
 
         UpdateFg int ->
             ( { model | fgColor = "#" ++ (ParseInt.toHex int) }, Cmd.none )
@@ -210,26 +186,7 @@ update msg model =
         UpdateSp int ->
             ( { model | spColor = "#" ++ (ParseInt.toHex int) }, Cmd.none )
 
-        Put strings ->
-            let
-                string =
-                    String.join "" strings
-            in
-                ( model, Cmd.none )
-
-        Resize columns lines ->
-            ( { model | columns = columns, lines = lines }, Cmd.none )
-
-        SetTitle title ->
-            ( { model | title = title }, Cmd.none )
-
-        SetIcon icon ->
-            ( { model | icon = icon }, Cmd.none )
-
-        EditorMessage message ->
-            ( { model | messages = model.messages ++ [ message ] }, Cmd.none )
-
-        _ ->
+        VisualBell ->
             ( model, Cmd.none )
 
 
@@ -242,8 +199,6 @@ view model =
     div []
         [ h1 [] [ text "Errors" ]
         , div [] <| List.map (\t -> li [] [ text t ]) model.errors
-        , h1 [] [ text "Messages" ]
-        , div [] <| List.map (\t -> li [] [ text t ]) model.messages
         ]
 
 
@@ -287,12 +242,17 @@ parseNotification notification =
                     , redrawVisualBell
                     , redrawSetTitle
                     , redrawSetIcon
-                    , JD.fail "Unhandled notification."
+                    , JD.fail ("Unhandled notification: " ++ notification)
                     ]
                 )
                 notification
     in
-        Result.withDefault (EditorMessage notification) result
+        case result of
+            Ok message ->
+                message
+
+            Err error ->
+                Error error
 
 
 first : JD.Decoder a -> JD.Decoder a
@@ -405,25 +365,25 @@ redrawModeChange =
 redrawBusyStart : JD.Decoder Msg
 redrawBusyStart =
     JD.at [ "redraw", "busy_start" ] <|
-        first (JD.succeed BusyStart)
+        first (JD.succeed (Busy True))
 
 
 redrawBusyStop : JD.Decoder Msg
 redrawBusyStop =
     JD.at [ "redraw", "busy_stop" ] <|
-        first (JD.succeed BusyStop)
+        first (JD.succeed (Busy False))
 
 
 redrawMouseOn : JD.Decoder Msg
 redrawMouseOn =
     JD.at [ "redraw", "mouse_on" ] <|
-        first (JD.succeed MouseOn)
+        first (JD.succeed (Mouse True))
 
 
 redrawMouseOff : JD.Decoder Msg
 redrawMouseOff =
     JD.at [ "redraw", "mouse_off" ] <|
-        first (JD.succeed MouseOff)
+        first (JD.succeed (Mouse False))
 
 
 redrawBell : JD.Decoder Msg
