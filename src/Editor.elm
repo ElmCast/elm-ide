@@ -99,6 +99,16 @@ attach columns lines =
         JE.object [ ( "columns", JE.int columns ), ( "lines", JE.int lines ) ]
 
 
+bell : Cmd msg
+bell =
+    send "bell" <| JE.null
+
+
+setTitle : String -> Cmd msg
+setTitle title =
+    send "set-title" <| JE.string title
+
+
 type Msg
     = Bell
     | Busy Bool
@@ -127,7 +137,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Bell ->
-            ( model, Cmd.none )
+            ( model, bell )
 
         Busy bool ->
             ( { model | busy = bool }, Cmd.none )
@@ -175,7 +185,7 @@ update msg model =
             ( { model | icon = icon }, Cmd.none )
 
         SetTitle title ->
-            ( { model | title = title }, Cmd.none )
+            ( { model | title = title }, setTitle title )
 
         UpdateFg int ->
             ( { model | fgColor = "#" ++ (ParseInt.toHex int) }, Cmd.none )

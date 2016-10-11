@@ -1,6 +1,7 @@
 const cp = require('child_process')
 const elm = require('./elm.js')
 const neovim = require('neovim-client')
+const electron = require('electron')
 
 const app = elm.Main.fullscreen()
 
@@ -45,7 +46,15 @@ neovim(nvim.stdin, nvim.stdout, (err, api) => {
                     }
                 })
                 api.command('doautocmd <nomodeline> GUIEnter')
-                break;
+                break
+
+            case 'set-title':
+                document.title = data
+                break
+
+            case 'bell':
+                electron.shell.beep()
+                break
         }
     })
 
