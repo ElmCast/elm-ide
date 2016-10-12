@@ -9,6 +9,7 @@ import Element exposing (Element)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Html.Lazy exposing (..)
 import Json.Decode as JD exposing ((:=))
 import Json.Encode as JE
 import Task
@@ -373,7 +374,7 @@ viewConsole model =
 view : Model -> Html Msg
 view model =
     div []
-        [ viewConsole model
+        [ lazy viewConsole model
         , input
             [ style [ ( "with", "100%" ) ]
             , id "input"
