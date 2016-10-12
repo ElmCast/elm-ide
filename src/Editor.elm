@@ -1,9 +1,16 @@
 port module Editor exposing (init, update, view, subscriptions)
 
+import Array exposing (Array)
+import Bitwise exposing (and, shiftRight)
+import Color exposing (Color, rgb)
+import Collage exposing (collage)
+import Element exposing (Element)
 import Html exposing (..)
+import Html.Attributes exposing (..)
 import Json.Decode as JD exposing ((:=))
 import Json.Encode as JE
-import ParseInt
+import Text exposing (Text)
+import Transform
 
 
 -- MODEL
@@ -38,9 +45,9 @@ type alias Region =
 type alias Editor =
     { columns : Int
     , lines : Int
-    , fgColor : String
-    , bgColor : String
-    , spColor : String
+    , fgColor : Int
+    , bgColor : Int
+    , spColor : Int
     , highlight : Highlight
     , cursor : Cursor
     , scroll : Int
@@ -51,6 +58,7 @@ type alias Editor =
     , title : String
     , icon : String
     , errors : List String
+    , console : List ( String, Highlight )
     }
 
 
@@ -61,11 +69,11 @@ type alias Model =
 init : ( Model, Cmd Msg )
 init =
     ( Editor
-        80
-        25
-        ""
-        ""
-        ""
+        120
+        40
+        0
+        0
+        0
         (Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
         (Cursor 0 0)
         0
@@ -75,6 +83,7 @@ init =
         True
         "ElmIDE"
         ""
+        []
         []
     , Cmd.none
     )
@@ -158,7 +167,7 @@ update msg model =
             ( { model | errors = message :: model.errors }, Cmd.none )
 
         HighlightSet highlights ->
-            ( model, Cmd.none )
+            ( { model | highlight = Maybe.withDefault model.highlight (List.head (List.reverse highlights)) }, Cmd.none )
 
         ModeChange mode ->
             ( { model | mode = mode }, Cmd.none )
@@ -167,13 +176,42 @@ update msg model =
             ( { model | mouse = bool }, Cmd.none )
 
         Put strings ->
-            ( model, Cmd.none )
+            let
+                index =
+                    model.cursor.line * model.columns + model.cursor.column
+
+                x =
+                    index `rem` model.columns
+
+                y =
+                    index // model.columns
+
+                left =
+                    List.take index model.console
+
+                middle =
+                    List.map (\string -> ( string, model.highlight )) strings
+
+                right =
+                    List.drop (index + (List.length middle)) model.console
+
+                console =
+                    left ++ middle ++ right
+
+                cursor =
+                    Cursor model.cursor.line (model.cursor.column + (List.length middle))
+            in
+                ( { model | console = console, cursor = cursor }, Cmd.none )
 
         Ready ->
             ( model, attach model.columns model.lines )
 
         Resize columns lines ->
-            ( { model | columns = columns, lines = lines }, Cmd.none )
+            let
+                console =
+                    (List.repeat (columns * lines) ( "", model.highlight ))
+            in
+                ( { model | columns = columns, lines = lines, console = console }, Cmd.none )
 
         Scroll scroll ->
             ( { model | scroll = scroll }, Cmd.none )
@@ -188,13 +226,13 @@ update msg model =
             ( { model | title = title }, setTitle title )
 
         UpdateFg int ->
-            ( { model | fgColor = "#" ++ (ParseInt.toHex int) }, Cmd.none )
+            ( { model | fgColor = int }, Cmd.none )
 
         UpdateBg int ->
-            ( { model | bgColor = "#" ++ (ParseInt.toHex int) }, Cmd.none )
+            ( { model | bgColor = int }, Cmd.none )
 
         UpdateSp int ->
-            ( { model | spColor = "#" ++ (ParseInt.toHex int) }, Cmd.none )
+            ( { model | spColor = int }, Cmd.none )
 
         VisualBell ->
             ( model, Cmd.none )
@@ -204,10 +242,79 @@ update msg model =
 -- VIEW
 
 
+intToColor : Int -> Color
+intToColor int =
+    rgb (and (shiftRight int 16) 255) (and (shiftRight int 8) 255) (and int 255)
+
+
+viewCell : Int -> Model -> ( String, Highlight ) -> Collage.Form
+viewCell i model ( string, highlight ) =
+    if string == "" then
+        Collage.group []
+    else
+        let
+            x =
+                (i `rem` model.columns) * 8 + 4
+
+            y =
+                (i // model.columns) * -16 - 6
+
+            style =
+                Text.style
+                    { typeface = [ "Ubuntu Mono" ]
+                    , height = Just 16
+                    , color = (intToColor (Maybe.withDefault model.fgColor highlight.foreground))
+                    , bold = Maybe.withDefault False highlight.bold
+                    , italic = Maybe.withDefault False highlight.italic
+                    , line = Maybe.map (always Text.Under) highlight.underline
+                    }
+
+            background =
+                Collage.rect 8 16
+                    |> Collage.filled (intToColor (Maybe.withDefault model.bgColor highlight.background))
+                    |> Collage.move ( 0, -3 )
+
+            text =
+                Text.fromString string
+                    |> style
+                    |> Collage.text
+        in
+            if string == "" then
+                Collage.group []
+            else
+                Collage.group [ background, text ]
+                    |> Collage.move ( toFloat x, toFloat y )
+
+
+viewConsole : Model -> Html a
+viewConsole model =
+    let
+        width =
+            toFloat (model.columns * 8)
+
+        height =
+            toFloat (model.lines * 16)
+
+        background =
+            Collage.rect (width * 2) (height * 2) |> Collage.filled (intToColor model.bgColor)
+
+        forms =
+            background :: (List.indexedMap (\i f -> viewCell i model f) model.console)
+
+        transform =
+            Transform.translation (-width / 2) (height / 2)
+
+        screen =
+            collage (model.columns * 8) (model.lines * 16) [ Collage.groupTransform transform forms ]
+    in
+        Element.toHtml screen
+
+
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "Errors" ]
+        [ viewConsole model
+        , h1 [] [ text "Errors" ]
         , div [] <| List.map (\t -> li [] [ text t ]) model.errors
         ]
 

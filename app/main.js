@@ -10,7 +10,7 @@ function notify(method, name, data) {
     app.ports.notifications.send(JSON.stringify(notification))
 }
 
-const nvim = cp.spawn('nvim', ['--embed'])
+const nvim = cp.spawn('nvim', ['--embed', "src/Editor.elm"])
 
 nvim.on('error', (err) => {
     notify('system', 'error', 'Failed to spawn neovim process: ' + err.message)
