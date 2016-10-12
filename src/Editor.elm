@@ -4,12 +4,14 @@ import Array exposing (Array)
 import Bitwise exposing (and, shiftRight)
 import Color exposing (Color, rgb)
 import Collage exposing (collage)
+import Dom
 import Element exposing (Element)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as JD exposing ((:=))
 import Json.Encode as JE
+import Task
 import Text exposing (Text)
 import Transform
 
@@ -126,8 +128,14 @@ sendInput input =
     send "input" <| JE.string input
 
 
+focus : String -> Cmd Msg
+focus id =
+    Dom.focus id
+        |> Task.perform (always NoOp) (always NoOp)
+
+
 type Msg
-    = Bell
+    = Bell Int
     | Busy Bool
     | Clear
     | CursorGoto Int Int
@@ -140,6 +148,7 @@ type Msg
     | InputText String
     | ModeChange String
     | Mouse Bool
+    | NoOp
     | Put (List String)
     | Ready
     | Resize Int Int
@@ -150,13 +159,13 @@ type Msg
     | UpdateBg Int
     | UpdateFg Int
     | UpdateSp Int
-    | VisualBell
+    | VisualBell Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Bell ->
+        Bell rings ->
             ( model, bell )
 
         Busy bool ->
@@ -181,7 +190,7 @@ update msg model =
             ( { model | highlight = Maybe.withDefault model.highlight (List.head (List.reverse highlights)) }, Cmd.none )
 
         InputBlur ->
-            ( { model | focus = True }, sendInput "<FocusLost>" )
+            { model | focus = True } ! [ sendInput "<FocusLost>", focus "input" ]
 
         InputFocus ->
             ( { model | focus = False }, sendInput "<FocusGained>" )
@@ -201,6 +210,9 @@ update msg model =
 
         Mouse bool ->
             ( { model | mouse = bool }, Cmd.none )
+
+        NoOp ->
+            ( model, Cmd.none )
 
         Put strings ->
             let
@@ -231,7 +243,7 @@ update msg model =
                 ( { model | console = console, cursor = cursor }, Cmd.none )
 
         Ready ->
-            ( model, attach model.columns model.lines )
+            model ! [ attach model.columns model.lines, focus "input" ]
 
         Resize columns lines ->
             let
@@ -261,7 +273,7 @@ update msg model =
         UpdateSp int ->
             ( { model | spColor = int }, Cmd.none )
 
-        VisualBell ->
+        VisualBell rings ->
             ( model, Cmd.none )
 
 
@@ -364,9 +376,12 @@ view model =
         [ viewConsole model
         , input
             [ style [ ( "with", "100%" ) ]
+            , id "input"
+            , class "hidden-input"
             , value ""
             , onFocus InputFocus
             , onInput InputText
+            , onBlur InputBlur
             ]
             []
         , h1 [] [ text "Errors" ]
@@ -561,13 +576,13 @@ redrawMouseOff =
 redrawBell : JD.Decoder Msg
 redrawBell =
     JD.at [ "redraw", "bell" ] <|
-        first (JD.succeed Bell)
+        JD.map (\bells -> Bell (List.length bells)) (JD.list (JD.succeed 0))
 
 
 redrawVisualBell : JD.Decoder Msg
 redrawVisualBell =
-    JD.at [ "redraw", "bell" ] <|
-        first (JD.succeed VisualBell)
+    JD.at [ "redraw", "visual_bell" ] <|
+        JD.map (\bells -> VisualBell (List.length bells)) (JD.list (JD.succeed 0))
 
 
 redrawSetTitle : JD.Decoder Msg
