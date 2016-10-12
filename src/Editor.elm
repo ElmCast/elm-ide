@@ -137,6 +137,7 @@ type Msg
     | HighlightSet (List Highlight)
     | InputBlur
     | InputFocus
+    | InputText String
     | ModeChange String
     | Mouse Bool
     | Put (List String)
@@ -184,6 +185,16 @@ update msg model =
 
         InputFocus ->
             ( { model | focus = False }, sendInput "<FocusGained>" )
+
+        InputText text ->
+            ( model
+            , sendInput
+                (if text == "<" then
+                    "<LT>"
+                 else
+                    text
+                )
+            )
 
         ModeChange mode ->
             ( { model | mode = mode }, Cmd.none )
@@ -351,7 +362,13 @@ view : Model -> Html Msg
 view model =
     div []
         [ viewConsole model
-        , input [ style [ ( "with", "100%" ) ], onFocus InputFocus ] []
+        , input
+            [ style [ ( "with", "100%" ) ]
+            , value ""
+            , onFocus InputFocus
+            , onInput InputText
+            ]
+            []
         , h1 [] [ text "Errors" ]
         , div [] <| List.map (\t -> li [] [ text t ]) model.errors
         ]
@@ -466,7 +483,7 @@ redrawClear =
 redrawEolClear : JD.Decoder Msg
 redrawEolClear =
     JD.at [ "redraw", "eol_clear" ] <|
-        first (JD.succeed EolClear)
+        first (first (JD.succeed EolClear))
 
 
 redrawCursorGoto : JD.Decoder Msg
