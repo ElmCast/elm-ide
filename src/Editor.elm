@@ -38,6 +38,11 @@ type alias Highlight =
     }
 
 
+emptyHighlight : Highlight
+emptyHighlight =
+    Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+
+
 type alias Region =
     { top : Int
     , left : Int
@@ -80,7 +85,7 @@ init =
         0
         0
         False
-        (Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
+        emptyHighlight
         (Cursor 0 0)
         0
         (Region 0 0 0 0)
@@ -163,6 +168,18 @@ type Msg
     | VisualBell Int
 
 
+splice : Int -> List a -> List a -> List a
+splice index new old =
+    let
+        left =
+            List.take index old
+
+        right =
+            List.drop (index + (List.length new)) old
+    in
+        left ++ new ++ right
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -182,7 +199,17 @@ update msg model =
             ( model, Cmd.none )
 
         EolClear ->
-            ( model, Cmd.none )
+            let
+                index =
+                    model.cursor.line * model.columns + model.cursor.column
+
+                new =
+                    List.repeat (model.columns - model.cursor.column) ( "", emptyHighlight )
+
+                console =
+                    splice index new model.console
+            in
+                ( { model | console = console }, Cmd.none )
 
         Error message ->
             ( { model | errors = message :: model.errors }, Cmd.none )
@@ -220,26 +247,14 @@ update msg model =
                 index =
                     model.cursor.line * model.columns + model.cursor.column
 
-                x =
-                    index `rem` model.columns
-
-                y =
-                    index // model.columns
-
-                left =
-                    List.take index model.console
-
-                middle =
+                new =
                     List.map (\string -> ( string, model.highlight )) strings
 
-                right =
-                    List.drop (index + (List.length middle)) model.console
-
                 console =
-                    left ++ middle ++ right
+                    splice index new model.console
 
                 cursor =
-                    Cursor model.cursor.line (model.cursor.column + (List.length middle))
+                    Cursor model.cursor.line (model.cursor.column + (List.length new))
             in
                 ( { model | console = console, cursor = cursor }, Cmd.none )
 
@@ -416,6 +431,7 @@ parseNotification notification =
                     , redrawUpdateSp
                     , redrawResize
                     , redrawClear
+                    , redrawEolClear
                     , redrawCursorGoto
                     , redrawPut
                     , redrawHighlightSet
@@ -499,7 +515,7 @@ redrawClear =
 redrawEolClear : JD.Decoder Msg
 redrawEolClear =
     JD.at [ "redraw", "eol_clear" ] <|
-        first (first (JD.succeed EolClear))
+        JD.map (always EolClear) (JD.list (JD.succeed []))
 
 
 redrawCursorGoto : JD.Decoder Msg
@@ -565,13 +581,13 @@ redrawBusyStop =
 redrawMouseOn : JD.Decoder Msg
 redrawMouseOn =
     JD.at [ "redraw", "mouse_on" ] <|
-        first (JD.succeed (Mouse True))
+        JD.map (always (Mouse True)) (JD.list (JD.succeed []))
 
 
 redrawMouseOff : JD.Decoder Msg
 redrawMouseOff =
     JD.at [ "redraw", "mouse_off" ] <|
-        first (JD.succeed (Mouse False))
+        JD.map (always (Mouse False)) (JD.list (JD.succeed []))
 
 
 redrawBell : JD.Decoder Msg
