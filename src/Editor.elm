@@ -269,17 +269,38 @@ viewCell i model ( string, highlight ) =
         Collage.group []
     else
         let
+            column =
+                (i `rem` model.columns)
+
+            line =
+                (i // model.columns)
+
             x =
-                (i `rem` model.columns) * 8 + 4
+                column * 8 + 4
 
             y =
-                (i // model.columns) * -16 - 6
+                line * -16 - 6
+
+            cursor =
+                model.cursor.column == column && model.cursor.line == line
+
+            fg =
+                if cursor then
+                    Color.black
+                else
+                    (intToColor (Maybe.withDefault model.fgColor highlight.foreground))
+
+            bg =
+                if cursor then
+                    Color.lightGray
+                else
+                    (intToColor (Maybe.withDefault model.bgColor highlight.background))
 
             style =
                 Text.style
                     { typeface = [ "Ubuntu Mono" ]
                     , height = Just 16
-                    , color = (intToColor (Maybe.withDefault model.fgColor highlight.foreground))
+                    , color = fg
                     , bold = Maybe.withDefault False highlight.bold
                     , italic = Maybe.withDefault False highlight.italic
                     , line = Maybe.map (always Text.Under) highlight.underline
@@ -287,7 +308,7 @@ viewCell i model ( string, highlight ) =
 
             background =
                 Collage.rect 8 16
-                    |> Collage.filled (intToColor (Maybe.withDefault model.bgColor highlight.background))
+                    |> Collage.filled bg
                     |> Collage.move ( 0, -3 )
 
             text =
