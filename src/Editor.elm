@@ -7,6 +7,7 @@ import Collage exposing (collage)
 import Element exposing (Element)
 import Html exposing (..)
 import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Json.Decode as JD exposing ((:=))
 import Json.Encode as JE
 import Text exposing (Text)
@@ -48,6 +49,7 @@ type alias Editor =
     , fgColor : Int
     , bgColor : Int
     , spColor : Int
+    , focus : Bool
     , highlight : Highlight
     , cursor : Cursor
     , scroll : Int
@@ -74,6 +76,7 @@ init =
         0
         0
         0
+        False
         (Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
         (Cursor 0 0)
         0
@@ -118,6 +121,11 @@ setTitle title =
     send "set-title" <| JE.string title
 
 
+sendInput : String -> Cmd msg
+sendInput input =
+    send "input" <| JE.string input
+
+
 type Msg
     = Bell
     | Busy Bool
@@ -127,6 +135,8 @@ type Msg
     | EolClear
     | Error String
     | HighlightSet (List Highlight)
+    | InputBlur
+    | InputFocus
     | ModeChange String
     | Mouse Bool
     | Put (List String)
@@ -168,6 +178,12 @@ update msg model =
 
         HighlightSet highlights ->
             ( { model | highlight = Maybe.withDefault model.highlight (List.head (List.reverse highlights)) }, Cmd.none )
+
+        InputBlur ->
+            ( { model | focus = True }, sendInput "<FocusLost>" )
+
+        InputFocus ->
+            ( { model | focus = False }, sendInput "<FocusGained>" )
 
         ModeChange mode ->
             ( { model | mode = mode }, Cmd.none )
@@ -314,6 +330,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ viewConsole model
+        , input [ style [ ( "with", "100%" ) ], onFocus InputFocus ] []
         , h1 [] [ text "Errors" ]
         , div [] <| List.map (\t -> li [] [ text t ]) model.errors
         ]
@@ -476,7 +493,7 @@ redrawSetScrollRegion =
 redrawModeChange : JD.Decoder Msg
 redrawModeChange =
     JD.at [ "redraw", "mode_change" ] <|
-        first (JD.map ModeChange JD.string)
+        (first (first (JD.map ModeChange JD.string)))
 
 
 redrawBusyStart : JD.Decoder Msg

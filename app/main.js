@@ -52,6 +52,10 @@ neovim(nvim.stdin, nvim.stdout, (err, api) => {
                 document.title = data
                 break
 
+            case 'input':
+                api.input(data)
+                break
+
             case 'bell':
                 electron.shell.beep()
                 break
