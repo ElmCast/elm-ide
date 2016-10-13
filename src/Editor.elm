@@ -27,9 +27,9 @@ type alias Cursor =
 
 
 type alias Highlight =
-    { foreground : Maybe Int
-    , background : Maybe Int
-    , special : Maybe Int
+    { foreground : Maybe Color
+    , background : Maybe Color
+    , special : Maybe Color
     , bold : Maybe Bool
     , italic : Maybe Bool
     , underline : Maybe Bool
@@ -54,9 +54,9 @@ type alias Region =
 type alias Editor =
     { columns : Int
     , lines : Int
-    , fgColor : Int
-    , bgColor : Int
-    , spColor : Int
+    , fgColor : Color
+    , bgColor : Color
+    , spColor : Color
     , focus : Bool
     , highlight : Highlight
     , cursor : Cursor
@@ -81,9 +81,9 @@ init =
     ( Editor
         120
         40
-        0
-        0
-        0
+        Color.black
+        Color.white
+        Color.red
         False
         emptyHighlight
         (Cursor 0 0)
@@ -162,9 +162,9 @@ type Msg
     | SetIcon String
     | SetScrollRegion Int Int Int Int
     | SetTitle String
-    | UpdateBg Int
-    | UpdateFg Int
-    | UpdateSp Int
+    | UpdateBg Color
+    | UpdateFg Color
+    | UpdateSp Color
     | VisualBell Int
 
 
@@ -280,14 +280,14 @@ update msg model =
         SetTitle title ->
             ( { model | title = title }, setTitle title )
 
-        UpdateFg int ->
-            ( { model | fgColor = int }, Cmd.none )
+        UpdateBg color ->
+            ( { model | bgColor = color }, Cmd.none )
 
-        UpdateBg int ->
-            ( { model | bgColor = int }, Cmd.none )
+        UpdateFg color ->
+            ( { model | fgColor = color }, Cmd.none )
 
-        UpdateSp int ->
-            ( { model | spColor = int }, Cmd.none )
+        UpdateSp color ->
+            ( { model | spColor = color }, Cmd.none )
 
         VisualBell rings ->
             ( model, Cmd.none )
@@ -295,11 +295,6 @@ update msg model =
 
 
 -- VIEW
-
-
-intToColor : Int -> Color
-intToColor int =
-    rgb (and (shiftRight int 16) 255) (and (shiftRight int 8) 255) (and int 255)
 
 
 viewCell : Int -> Model -> ( String, Highlight ) -> Collage.Form
@@ -327,13 +322,13 @@ viewCell i model ( string, highlight ) =
                 if cursor then
                     Color.black
                 else
-                    (intToColor (Maybe.withDefault model.fgColor highlight.foreground))
+                    Maybe.withDefault model.fgColor highlight.foreground
 
             bg =
                 if cursor then
                     Color.lightGray
                 else
-                    (intToColor (Maybe.withDefault model.bgColor highlight.background))
+                    Maybe.withDefault model.bgColor highlight.background
 
             style =
                 Text.style
@@ -372,7 +367,7 @@ viewConsole model =
             toFloat (model.lines * 16)
 
         background =
-            Collage.rect (width * 2) (height * 2) |> Collage.filled (intToColor model.bgColor)
+            Collage.rect (width * 2) (height * 2) |> Collage.filled model.bgColor
 
         forms =
             background :: (List.indexedMap (\i f -> viewCell i model f) model.console)
@@ -414,11 +409,16 @@ port notifications : (String -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    notifications parseNotification
+    notifications decodeNotification
 
 
-parseNotification : String -> Msg
-parseNotification notification =
+decodeColor : Int -> Color
+decodeColor int =
+    rgb (and (shiftRight int 16) 255) (and (shiftRight int 8) 255) (and int 255)
+
+
+decodeNotification : String -> Msg
+decodeNotification notification =
     let
         result =
             JD.decodeString
@@ -482,22 +482,22 @@ systemReady =
         JD.succeed Ready
 
 
-redrawUpdateFg : JD.Decoder Msg
-redrawUpdateFg =
-    JD.at [ "redraw", "update_fg" ] <|
-        first (JD.tuple1 UpdateFg JD.int)
-
-
 redrawUpdateBg : JD.Decoder Msg
 redrawUpdateBg =
     JD.at [ "redraw", "update_bg" ] <|
-        first (JD.tuple1 UpdateBg JD.int)
+        first (JD.tuple1 (UpdateBg << decodeColor) JD.int)
+
+
+redrawUpdateFg : JD.Decoder Msg
+redrawUpdateFg =
+    JD.at [ "redraw", "update_fg" ] <|
+        first (JD.tuple1 (UpdateFg << decodeColor) JD.int)
 
 
 redrawUpdateSp : JD.Decoder Msg
 redrawUpdateSp =
     JD.at [ "redraw", "update_sp" ] <|
-        first (JD.tuple1 UpdateSp JD.int)
+        first (JD.tuple1 (UpdateSp << decodeColor) JD.int)
 
 
 redrawResize : JD.Decoder Msg
@@ -533,8 +533,14 @@ redrawPut =
 redrawHighlightSet : JD.Decoder Msg
 redrawHighlightSet =
     let
+        parseColors fg bg sp =
+            Highlight
+                (Maybe.map decodeColor fg)
+                (Maybe.map decodeColor bg)
+                (Maybe.map decodeColor sp)
+
         highlight =
-            JD.object8 Highlight
+            JD.object8 parseColors
                 (JD.maybe ("foreground" := JD.int))
                 (JD.maybe ("background" := JD.int))
                 (JD.maybe ("special" := JD.int))
