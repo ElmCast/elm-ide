@@ -297,65 +297,46 @@ update msg model =
 -- VIEW
 
 
-viewCell : Int -> Model -> ( String, Highlight ) -> Collage.Form
-viewCell i model ( string, highlight ) =
-    let
-        column =
-            (i `rem` model.columns)
+viewCell : Float -> Float -> Bool -> Color -> Color -> String -> Highlight -> Collage.Form
+viewCell x y cursor fgColor bgColor string highlight =
+    if string == "" && not cursor then
+        Collage.group []
+    else
+        let
+            fg =
+                if cursor then
+                    Color.white
+                else
+                    Maybe.withDefault fgColor highlight.foreground
 
-        line =
-            (i // model.columns)
+            bg =
+                if cursor then
+                    Color.darkGray
+                else
+                    Maybe.withDefault bgColor highlight.background
 
-        x =
-            column * 8 + 4
+            style =
+                Text.style
+                    { typeface = [ "Ubuntu Mono" ]
+                    , height = Just 16
+                    , color = fg
+                    , bold = Maybe.withDefault False highlight.bold
+                    , italic = Maybe.withDefault False highlight.italic
+                    , line = Maybe.map (always Text.Under) highlight.underline
+                    }
 
-        y =
-            line * -16 - 6
+            background =
+                Collage.rect 8 16
+                    |> Collage.filled bg
+                    |> Collage.move ( 0, -3 )
 
-        cursor =
-            model.cursor.column == column && model.cursor.line == line
-
-        fg =
-            if cursor then
-                Color.white
-            else
-                Maybe.withDefault model.fgColor highlight.foreground
-
-        bg =
-            if cursor then
-                Color.darkGray
-            else
-                Maybe.withDefault model.bgColor highlight.background
-
-        style =
-            Text.style
-                { typeface = [ "Ubuntu Mono" ]
-                , height = Just 16
-                , color = fg
-                , bold = Maybe.withDefault False highlight.bold
-                , italic = Maybe.withDefault False highlight.italic
-                , line = Maybe.map (always Text.Under) highlight.underline
-                }
-
-        background =
-            Collage.rect 8 16
-                |> Collage.filled bg
-                |> Collage.move ( 0, -3 )
-
-        text =
-            Text.fromString string
-                |> style
-                |> Collage.text
-
-        cell =
-            if string == "" && cursor then
-                Collage.group [ background ]
-            else if string == "" then
-                Collage.group []
-            else
-                Collage.group [ background, text ]
-    in
-        cell |> Collage.move ( toFloat x, toFloat y )
+            text =
+                Text.fromString string
+                    |> style
+                    |> Collage.text
+        in
+            Collage.group [ background, text ]
+                |> Collage.move ( x, y )
 
 
 viewConsole : Model -> Html a
@@ -370,14 +351,36 @@ viewConsole model =
         background =
             Collage.rect (width * 2) (height * 2) |> Collage.filled model.bgColor
 
+        cell index ( string, highlight ) =
+            let
+                column =
+                    (index `rem` model.columns)
+
+                line =
+                    (index // model.columns)
+
+                cursor =
+                    model.cursor.column == column && model.cursor.line == line
+
+                x =
+                    toFloat (column * 8 + 4)
+
+                y =
+                    toFloat (line * -16 - 6)
+            in
+                viewCell x y cursor model.fgColor model.bgColor string highlight
+
         forms =
-            background :: (List.indexedMap (\i f -> viewCell i model f) model.console)
+            background :: (List.indexedMap cell model.console)
 
         transform =
             Transform.translation (-width / 2) (height / 2)
 
         screen =
-            collage (model.columns * 8) (model.lines * 16) [ Collage.groupTransform transform forms ]
+            collage
+                (model.columns * 8)
+                (model.lines * 16)
+                [ Collage.groupTransform transform forms ]
     in
         Element.toHtml screen
 
