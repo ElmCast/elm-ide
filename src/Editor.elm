@@ -299,62 +299,63 @@ update msg model =
 
 viewCell : Int -> Model -> ( String, Highlight ) -> Collage.Form
 viewCell i model ( string, highlight ) =
-    if string == "" then
-        Collage.group []
-    else
-        let
-            column =
-                (i `rem` model.columns)
+    let
+        column =
+            (i `rem` model.columns)
 
-            line =
-                (i // model.columns)
+        line =
+            (i // model.columns)
 
-            x =
-                column * 8 + 4
+        x =
+            column * 8 + 4
 
-            y =
-                line * -16 - 6
+        y =
+            line * -16 - 6
 
-            cursor =
-                model.cursor.column == column && model.cursor.line == line
+        cursor =
+            model.cursor.column == column && model.cursor.line == line
 
-            fg =
-                if cursor then
-                    Color.black
-                else
-                    Maybe.withDefault model.fgColor highlight.foreground
+        fg =
+            if cursor then
+                Color.white
+            else
+                Maybe.withDefault model.fgColor highlight.foreground
 
-            bg =
-                if cursor then
-                    Color.lightGray
-                else
-                    Maybe.withDefault model.bgColor highlight.background
+        bg =
+            if cursor then
+                Color.darkGray
+            else
+                Maybe.withDefault model.bgColor highlight.background
 
-            style =
-                Text.style
-                    { typeface = [ "Ubuntu Mono" ]
-                    , height = Just 16
-                    , color = fg
-                    , bold = Maybe.withDefault False highlight.bold
-                    , italic = Maybe.withDefault False highlight.italic
-                    , line = Maybe.map (always Text.Under) highlight.underline
-                    }
+        style =
+            Text.style
+                { typeface = [ "Ubuntu Mono" ]
+                , height = Just 16
+                , color = fg
+                , bold = Maybe.withDefault False highlight.bold
+                , italic = Maybe.withDefault False highlight.italic
+                , line = Maybe.map (always Text.Under) highlight.underline
+                }
 
-            background =
-                Collage.rect 8 16
-                    |> Collage.filled bg
-                    |> Collage.move ( 0, -3 )
+        background =
+            Collage.rect 8 16
+                |> Collage.filled bg
+                |> Collage.move ( 0, -3 )
 
-            text =
-                Text.fromString string
-                    |> style
-                    |> Collage.text
-        in
-            if string == "" then
+        text =
+            Text.fromString string
+                |> style
+                |> Collage.text
+
+        cell =
+            if string == "" && cursor then
+                Collage.group [ background ]
+            else if string == "" then
                 Collage.group []
             else
                 Collage.group [ background, text ]
-                    |> Collage.move ( toFloat x, toFloat y )
+    in
+        cell |> Collage.move ( toFloat x, toFloat y )
 
 
 viewConsole : Model -> Html a
