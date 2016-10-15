@@ -38,11 +38,6 @@ type alias Highlight =
     }
 
 
-emptyHighlight : Highlight
-emptyHighlight =
-    Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-
-
 type alias Region =
     { top : Int
     , left : Int
@@ -85,7 +80,7 @@ init =
         Color.white
         Color.red
         False
-        emptyHighlight
+        (Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
         (Cursor 0 0)
         0
         (Region 0 0 0 0)
@@ -204,7 +199,9 @@ update msg model =
                     model.cursor.line * model.columns + model.cursor.column
 
                 new =
-                    List.repeat (model.columns - model.cursor.column) ( "", emptyHighlight )
+                    List.repeat
+                        (model.columns - model.cursor.column)
+                        ( "", Highlight Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
 
                 console =
                     splice index new model.console
