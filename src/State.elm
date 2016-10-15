@@ -33,18 +33,6 @@ init =
     )
 
 
-splice : Int -> List a -> List a -> List a
-splice index new old =
-    let
-        left =
-            List.take index old
-
-        right =
-            List.drop (index + (List.length new)) old
-    in
-        left ++ new ++ right
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
